@@ -133,6 +133,16 @@ export async function crawlPage(url, options = {}) {
       componentScreenshots = await captureComponentScreenshots(page, outDir);
     }
 
+    // Issue #110: capture dark themes shipped purely via
+    // @media (prefers-color-scheme: dark). Do this before the depth crawl
+    // below navigates `page` away to internal routes, otherwise the media
+    // pass would read colours off the wrong page. No reload, it just flips
+    // the media feature on the already-loaded page.
+    let mediaColors = null;
+    if (dark) {
+      mediaColors = await extractMediaDarkColors(page).catch(() => null);
+    }
+
     // Multi-page crawl: discover internal links and extract from them
     let additionalPages = [];
     const routes = [];
@@ -169,10 +179,6 @@ export async function crawlPage(url, options = {}) {
     // Dark mode extraction
     let darkData = null;
     if (dark) {
-      // Issue #110: capture dark themes shipped purely via
-      // @media (prefers-color-scheme: dark) by flipping just the media feature
-      // on the already-loaded page (no reload) before the class/context pass.
-      const mediaColors = await extractMediaDarkColors(page).catch(() => null);
       await context.close();
       const darkContext = await browser.newContext({
         viewport: { width, height },
